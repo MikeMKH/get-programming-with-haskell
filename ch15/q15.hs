@@ -42,3 +42,66 @@ xorPair (x, y) = xorBool x y
 
 xor :: [Bool] -> [Bool] -> [Bool]
 xor xs ys = map xorPair $ zip xs ys
+
+type Bits = [Bool]
+
+intToBits' :: Int -> Bits
+intToBits' 0 = [False]
+intToBits' 1 = [True]
+intToBits' n =
+  if remainder == 0
+    then False : intToBits' next
+    else True : intToBits' next
+  where
+    remainder = n `mod` 2
+    next = n `div` 2
+
+intToBits :: Int -> Bits
+intToBits n = padding ++ reverseBits
+  where
+    reverseBits = reverse $ intToBits' n
+    maxBits = length $ intToBits' maxBound
+    missingBits = maxBits - (length reverseBits)
+    padding = take missingBits $ cycle [False]
+
+charToBits :: Char -> Bits
+charToBits c = intToBits $ fromEnum c
+
+bitsToInt :: Bits -> Int
+bitsToInt bs = sum $ map (\x -> 2^(snd x)) trues
+  where
+    size = length bs
+    indices = [size-1, size-2 .. 0]
+    trues = filter (\x -> fst x == True) $ zip bs indices
+
+bitsToChar :: Bits -> Char
+bitsToChar bs = toEnum (bitsToInt bs)
+
+applyOTP' :: String -> String -> [Bits]
+applyOTP' pad text = map (\pair -> (fst pair) `xor` (snd pair)) $ zip padBits textBits
+  where
+    padBits = map charToBits pad
+    textBits = map charToBits text
+    
+applyOTP :: String -> String -> String
+applyOTP pad text = map bitsToChar $ applyOTP' pad text
+
+class Chiper a
+  where
+    encode :: a -> String -> String
+    decode :: a -> String -> String
+
+data Rot = Rot
+
+instance Chiper Rot
+  where
+    encode Rot text = rotEncoder text
+    decode Rot text = rotDecoder text
+
+data OneTimePad = OTP String
+
+instance Chiper OneTimePad
+  where
+    encode (OTP pad) text = applyOTP pad text
+    decode (OTP pad) text = applyOTP pad text
+  
