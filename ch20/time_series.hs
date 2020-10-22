@@ -85,3 +85,88 @@ instance Monoid (TS a) where
 
 ts :: TS Double
 ts = mconcat [ts1, ts2, ts3, ts4]
+
+mean :: (Real a) => [a] -> Double
+mean xs = total / count
+  where
+    total = (realToFrac . sum) xs
+    count = (realToFrac . length) xs
+
+meanTS :: (Real a) => TS a -> Maybe Double
+meanTS (TS _ []) = Nothing
+meanTS (TS _ values) =
+  if all (== Nothing) values
+    then Nothing
+    else Just avg
+  where
+    justValues = filter isJust values
+    xs = map fromJust justValues
+    avg = mean xs
+
+type CompareFunc a = a -> a -> a
+type TSCompareFunc a = (Int, Maybe a) -> (Int, Maybe a) -> (Int, Maybe a)
+
+makeTSCompare :: Eq a => CompareFunc a -> TSCompareFunc a
+makeTSCompare f = g
+  where
+    g (t1, Nothing) (t2, Nothing) = (t1, Nothing)
+    g (_, Nothing) (t, v) = (t, v)
+    g (t, v) (_, Nothing) = (t, v)
+    g (t1, Just v1) (t2, Just v2) =
+      if f v1 v2 == v1
+        then (t1, Just v1)
+        else (t2, Just v2)
+
+compareTS :: Eq a => (a -> a -> a) -> TS a -> Maybe (Int, Maybe a)
+compareTS _ (TS [] []) = Nothing
+compareTS f (TS times values) =
+  if all (== Nothing) values
+    then Nothing
+    else Just best
+  where
+    pairs = zip times values
+    best = foldl (makeTSCompare f) (0, Nothing) pairs
+
+minTS :: Ord a => TS a -> Maybe (Int, Maybe a)
+minTS = compareTS min
+
+maxTS :: Ord a => TS a -> Maybe (Int, Maybe a)
+maxTS = compareTS max
+
+diffPair :: Num a => Maybe a -> Maybe a -> Maybe a
+diffPair Nothing _ = Nothing
+diffPair _ Nothing = Nothing
+diffPair (Just x) (Just y) = Just $ x - y
+
+diffTS :: Num a => TS a -> TS a
+diffTS (TS [] []) = TS [] []
+diffTS (TS times values) = TS times (Nothing : diffValues)
+  where
+    shiftedValues = tail values
+    diffValues = zipWith diffPair shiftedValues values
+
+meanMaybe :: Real a => [Maybe a] -> Maybe Double
+meanMaybe values =
+  if any (== Nothing) values
+    then Nothing
+    else (Just avg)
+  where
+    avg = mean $ map fromJust values
+    
+movingAverage :: Real a => [Maybe a] -> Int -> [Maybe Double]
+movingAverage [] _ = []
+movingAverage values n =
+  if length nextValues == n
+    then meanMaybe nextValues : movingAverage restValues n
+    else []
+  where
+    nextValues = take n values
+    restValues = tail values
+
+movingAverageTS :: Real a => TS a -> Int -> TS Double
+movingAverageTS (TS [] []) _ = TS [] []
+movingAverageTS (TS times values) n = TS times smoothValues
+  where
+    ma = movingAverage values n
+    padding = replicate (n `div` 2) Nothing
+    smoothValues = mconcat [padding, ma, padding]
