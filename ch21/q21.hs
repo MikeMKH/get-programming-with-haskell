@@ -12,7 +12,6 @@ maybeMain = do
   let response = helloPerson name
   return response
 
-
 fib' :: (Eq t1, Num t1, Num t2) => t2 -> t2 -> t1 -> t2
 fib' _ _ 0 = 0
 fib' _ _ 1 = 1
