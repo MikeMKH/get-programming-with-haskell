@@ -88,6 +88,48 @@ getDirectory record = B.take directoryLength afterLeader
     directoryLength = getDirectoryLength record
     afterLeader = B.drop leaderLength record
 
+type MarcDirectoryEntryRaw = B.ByteString
+
+directoryEntryLength :: Int
+directoryEntryLength = 12
+
+splitDirectory :: MarcDirectoryRaw -> [MarcDirectoryEntryRaw]
+splitDirectory directory =
+  if directory == B.empty
+    then []
+    else next : splitDirectory rest
+  where
+    (next, rest) = B.splitAt directoryEntryLength directory
+
+data FieldMetadata = FieldMetadata {
+   tag :: T.Text
+  ,fieldLength :: Int
+  ,fieldStart :: Int
+} deriving Show
+
+makeFieldMetadata :: MarcDirectoryEntryRaw -> FieldMetadata
+makeFieldMetadata entry = FieldMetadata theTag theLength theStart
+  where
+    (rawTag, rest) = B.splitAt 3 entry
+    theTag = E.decodeUtf8 rawTag
+    (rawLength, rawStart) = B.splitAt 4 rest
+    theLength = rawToInt rawLength
+    theStart = rawToInt rawStart
+
+getFieldMetadata :: [MarcDirectoryEntryRaw] -> [FieldMetadata]
+getFieldMetadata entries = map makeFieldMetadata entries
+
+type FieldText = T.Text
+
+getFieldText :: MarcRecordRaw -> FieldMetadata -> FieldText
+getFieldText record metadata = E.decodeUtf8 byteStringValue
+  where
+    recordLength = getRecordLength record
+    baseAddress = getBaseAddress record
+    baseRecord = B.drop baseAddress record
+    baseAtEntry = B.drop (fieldStart metadata) baseRecord
+    byteStringValue = B.take (fieldLength metadata) baseAtEntry
+
 -- downloaded from https://archive.org/download/marc_oregon_summit_records/catalog_files/
 -- renamed to sample.mrc and placed in same directory as source file
 marcFileName :: String
