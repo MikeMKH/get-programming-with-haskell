@@ -200,5 +200,5 @@ marcFileName = "sample.mrc"
 main :: IO()
 main = do
   raw <- B.readFile marcFileName
-  let records = allRecords raw
-  print $ length records
+  let processed = processRecords 500 raw
+  TIO.writeFile "book.html" processed
