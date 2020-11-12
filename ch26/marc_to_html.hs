@@ -129,6 +129,68 @@ getFieldText record metadata = E.decodeUtf8 byteStringValue
     baseRecord = B.drop baseAddress record
     baseAtEntry = B.drop (fieldStart metadata) baseRecord
     byteStringValue = B.take (fieldLength metadata) baseAtEntry
+    
+fieldDelimiter :: Char
+fieldDelimiter = toEnum 31
+
+titleTag :: T.Text
+titleTag = "245"
+
+titleSubfield :: Char
+titleSubfield = 'a'
+
+authorTag :: T.Text
+authorTag = "100"
+
+authorSubfield :: Char
+authorSubfield = 'a'
+
+lookupFieldMetadata :: T.Text -> MarcRecordRaw -> Maybe FieldMetadata
+lookupFieldMetadata aTag record =
+  if length results < 1
+    then Nothing
+    else Just $ head results
+  where
+    metadata = (getFieldMetadata . splitDirectory . getDirectory) record
+    results = filter ((== aTag) . tag) metadata
+
+lookupSubfield :: Maybe FieldMetadata -> Char -> MarcRecordRaw -> Maybe T.Text
+lookupSubfield Nothing _ _ = Nothing
+lookupSubfield (Just fieldMetadata) subfield record =
+  if results == []
+    then Nothing
+    else Just $ (T.drop 1 . head) results
+  where
+    rawField = getFieldText record fieldMetadata
+    subfields = T.split (== fieldDelimiter) rawField
+    results = filter ((== subfield) . T.head) subfields
+
+lookupValue :: T.Text -> Char -> MarcRecordRaw -> Maybe T.Text
+lookupValue aTag subfield record = lookupSubfield entryMetadata subfield record
+  where
+    entryMetadata = lookupFieldMetadata aTag record
+
+lookupTitle :: MarcRecordRaw -> Maybe Title
+lookupTitle = lookupValue titleTag titleSubfield
+
+lookupAuthor :: MarcRecordRaw -> Maybe Author
+lookupAuthor = lookupValue authorTag authorSubfield
+
+marcToPairs :: B.ByteString -> [(Maybe Title, Maybe Author)]
+marcToPairs stream = zip titles authors
+  where
+    records = allRecords stream
+    titles = map lookupTitle records
+    authors = map lookupAuthor records
+
+pairsToBooks :: [(Maybe Title, Maybe Author)] -> [Book]
+pairsToBooks pairs =
+  map (\(title, author) -> Book { title = fromJust title, author = fromJust author }) justPairs
+  where
+    justPairs = filter (\(title, author) -> isJust title && isJust author) pairs
+
+processRecords :: Int -> B.ByteString -> Html
+processRecords n = booksToHtml . pairsToBooks . (take n) . marcToPairs
 
 -- downloaded from https://archive.org/download/marc_oregon_summit_records/catalog_files/
 -- renamed to sample.mrc and placed in same directory as source file
