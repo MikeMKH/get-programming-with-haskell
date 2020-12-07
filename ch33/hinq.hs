@@ -1,5 +1,5 @@
-import Control.Monad
-import Control.Applicative
+import Control.Monad ( guard )
+import Control.Applicative ( Alternative )
 
 data Name = Name
   { firstName :: String
