@@ -26,5 +26,17 @@ instance FromJSON Book
 bookJson :: BC.ByteString
 bookJson = encode book
 
+raw :: BC.ByteString
+raw = "{\"author\":\"Kent Beck\",\"title\":\"Smalltalk Best Practice Patterns\",\"year\":1997}"
+
+rawBook :: Maybe Book
+rawBook = decode raw
+
+wrong :: BC.ByteString
+wrong = "{\"author\":\"a\",\"title\":\"t\",\"stuff\":12}"
+
+wrongBook :: Maybe Book
+wrongBook = decode wrong
+
 main :: IO ()
 main = print "Hi"
